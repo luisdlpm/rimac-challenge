@@ -1,0 +1,183 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: cactusdlpm
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: agendamiento
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: rimacchallenge
+
+stages:
+  default:
+    params:
+      tableName: "appointments-table-${sls:stage}-${sls:instanceId}"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'} 
+  # Uncomment to easily set up a custom domain. Read the docs for more details:
+  # https://www.serverless.com/framework/docs/providers/aws/guide/domains
+  # domain: api.example.com
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+             - Fn::GetAtt: [AppointmentsTable, Arn]
+                # Permisos para SNS
+        - Effect: Allow
+          Action:
+            - sns:Publish
+            - sns:Subscribe
+            - sns:CreateTopic
+          Resource: "*"
+        # Permisos para SQS
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+          Resource: "*"
+        # Permisos para EventBridge
+        - Effect: Allow
+          Action:
+            - events:PutEvents
+          Resource: "*"
+
+  environment:
+    APPOINTMENTS_TABLE: ${param:tableName}
+    SNS_TOPIC_ARN: { "Ref": "AppointmentTopic" }
+    SQS_PE_URL: { "Ref": "SqsPE" }
+    SQS_CL_URL: { "Ref": "SqsCL" }
+
+functions:
+  # Lambda principal (ya la tienes)
+  appointment:
+    handler: handlers/appointment.appointment
+    events:
+      - httpApi:
+          path: /appointment
+          method: post
+      - httpApi:
+          path: /appointment/{insuredId}
+          method: get
+      # Para escuchar el SQS de confirmaciones (opcional)
+      - sqs:
+          arn:
+            Fn::GetAtt: [SqsConfirmaciones, Arn]
+
+  # Lambda para Perú
+  appointment_pe:
+    handler: handlers/appointment_pe.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [SqsPE, Arn]
+
+  # Lambda para Chile
+  appointment_cl:
+    handler: handlers/appointment_cl.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [SqsCL, Arn]
+
+resources:
+  Resources:
+    AppointmentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: insuredId
+            AttributeType: S
+          - AttributeName: scheduleId
+            AttributeType: N
+        KeySchema:
+          - AttributeName: insuredId
+            KeyType: HASH
+          - AttributeName: scheduleId
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        TableName: appointments-table-${sls:stage}-${sls:instanceId}
+
+    SqsConfirmaciones:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: sqs_confirmaciones
+    # SNS Topic
+    AppointmentTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: appointment-topic-${sls:stage}
+
+    # SQS Queues
+    SqsPE:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: sqs_pe-${sls:stage}
+
+    SqsCL:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: sqs_cl-${sls:stage}
+
+    # SNS Subscriptions to SQS
+    SnsSubscriptionPE:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Protocol: sqs
+        TopicArn: { "Ref": "AppointmentTopic" }
+        Endpoint: { "Fn::GetAtt": [SqsPE, "Arn"] }
+
+    SnsSubscriptionCL:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Protocol: sqs
+        TopicArn: { "Ref": "AppointmentTopic" }
+        Endpoint: { "Fn::GetAtt": [SqsCL, "Arn"] }
+
+    # EventBridge (Event Bus)
+    EventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: rimacchallenge-bus-${sls:stage}
+
+    # Permisos SQS para recibir mensajes de SNS
+    SqsPolicyPE:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - Ref: SqsPE
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal: "*"
+              Action: SQS:SendMessage
+              Resource: { "Fn::GetAtt": [SqsPE, Arn] }
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: { "Ref": "AppointmentTopic" }
+
+    SqsPolicyCL:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - Ref: SqsCL
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal: "*"
+              Action: SQS:SendMessage
+              Resource: { "Fn::GetAtt": [SqsCL, Arn] }
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: { "Ref": "AppointmentTopic" }

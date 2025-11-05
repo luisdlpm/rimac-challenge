@@ -1,0 +1,720 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The AWS CloudFormation template for this Serverless application",
+  "Resources": {
+    "AppointmentLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/rimacchallenge-dev-appointment"
+      }
+    },
+    "AppointmentUnderscorepeLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/rimacchallenge-dev-appointment_pe"
+      }
+    },
+    "AppointmentUnderscoreclLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/rimacchallenge-dev-appointment_cl"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "rimacchallenge",
+                  "dev",
+                  "lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:TagResource"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/rimacchallenge-dev*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/rimacchallenge-dev*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "AppointmentsTable",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish",
+                    "sns:Subscribe",
+                    "sns:CreateTopic"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage",
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "events:PutEvents"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "SqsConfirmaciones",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "SqsPE",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "SqsCL",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              "rimacchallenge",
+              "dev",
+              {
+                "Ref": "AWS::Region"
+              },
+              "lambdaRole"
+            ]
+          ]
+        }
+      }
+    },
+    "AppointmentLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "serverless-framework-deployments-us-east-1-37d6dadd-3cf9",
+          "S3Key": "serverless/rimacchallenge/dev/1762321702323-2025-11-05T05:48:22.323Z/rimacchallenge.zip"
+        },
+        "Handler": "handlers/appointment.appointment",
+        "Runtime": "nodejs20.x",
+        "FunctionName": "rimacchallenge-dev-appointment",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Environment": {
+          "Variables": {
+            "APPOINTMENTS_TABLE": "appointments-table-dev-1762321688051",
+            "SNS_TOPIC_ARN": {
+              "Ref": "AppointmentTopic"
+            },
+            "SQS_PE_URL": {
+              "Ref": "SqsPE"
+            },
+            "SQS_CL_URL": {
+              "Ref": "SqsCL"
+            }
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "AppointmentLogGroup"
+      ]
+    },
+    "AppointmentUnderscorepeLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "serverless-framework-deployments-us-east-1-37d6dadd-3cf9",
+          "S3Key": "serverless/rimacchallenge/dev/1762321702323-2025-11-05T05:48:22.323Z/rimacchallenge.zip"
+        },
+        "Handler": "handlers/appointment_pe.handler",
+        "Runtime": "nodejs20.x",
+        "FunctionName": "rimacchallenge-dev-appointment_pe",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Environment": {
+          "Variables": {
+            "APPOINTMENTS_TABLE": "appointments-table-dev-1762321688051",
+            "SNS_TOPIC_ARN": {
+              "Ref": "AppointmentTopic"
+            },
+            "SQS_PE_URL": {
+              "Ref": "SqsPE"
+            },
+            "SQS_CL_URL": {
+              "Ref": "SqsCL"
+            }
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "AppointmentUnderscorepeLogGroup"
+      ]
+    },
+    "AppointmentUnderscoreclLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "serverless-framework-deployments-us-east-1-37d6dadd-3cf9",
+          "S3Key": "serverless/rimacchallenge/dev/1762321702323-2025-11-05T05:48:22.323Z/rimacchallenge.zip"
+        },
+        "Handler": "handlers/appointment_cl.handler",
+        "Runtime": "nodejs20.x",
+        "FunctionName": "rimacchallenge-dev-appointment_cl",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Environment": {
+          "Variables": {
+            "APPOINTMENTS_TABLE": "appointments-table-dev-1762321688051",
+            "SNS_TOPIC_ARN": {
+              "Ref": "AppointmentTopic"
+            },
+            "SQS_PE_URL": {
+              "Ref": "SqsPE"
+            },
+            "SQS_CL_URL": {
+              "Ref": "SqsCL"
+            }
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "AppointmentUnderscoreclLogGroup"
+      ]
+    },
+    "AppointmentLambdaVersionZaqcfAqtZGmNxu1FgAtil9z1lZzqybivFFsgDJzazY": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "AppointmentLambdaFunction"
+        },
+        "CodeSha256": "/7VGikSh9KgJ+TuMqbznfPQLQcNaT5UMqxPTC9EOJ5s="
+      }
+    },
+    "AppointmentUnderscorepeLambdaVersionJNW9jzHd49VnOqC7g04yAW4GKHPXDjY42h7aKzvnAcg": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "AppointmentUnderscorepeLambdaFunction"
+        },
+        "CodeSha256": "/7VGikSh9KgJ+TuMqbznfPQLQcNaT5UMqxPTC9EOJ5s="
+      }
+    },
+    "AppointmentUnderscoreclLambdaVersionQAGEEsNayb2GC6J6Euse0xRTyvOfz6pbTLC6XpNM3o": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "AppointmentUnderscoreclLambdaFunction"
+        },
+        "CodeSha256": "/7VGikSh9KgJ+TuMqbznfPQLQcNaT5UMqxPTC9EOJ5s="
+      }
+    },
+    "AppointmentEventSourceMappingSQSSqsConfirmaciones": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "IamRoleLambdaExecution"
+      ],
+      "Properties": {
+        "BatchSize": 10,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "SqsConfirmaciones",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AppointmentLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Enabled": true
+      }
+    },
+    "AppointmentUnderscorepeEventSourceMappingSQSSqsPE": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "IamRoleLambdaExecution"
+      ],
+      "Properties": {
+        "BatchSize": 10,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "SqsPE",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AppointmentUnderscorepeLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Enabled": true
+      }
+    },
+    "AppointmentUnderscoreclEventSourceMappingSQSSqsCL": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "IamRoleLambdaExecution"
+      ],
+      "Properties": {
+        "BatchSize": 10,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "SqsCL",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AppointmentUnderscoreclLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Enabled": true
+      }
+    },
+    "HttpApi": {
+      "Type": "AWS::ApiGatewayV2::Api",
+      "Properties": {
+        "Name": "dev-rimacchallenge",
+        "ProtocolType": "HTTP"
+      }
+    },
+    "HttpApiStage": {
+      "Type": "AWS::ApiGatewayV2::Stage",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "StageName": "$default",
+        "AutoDeploy": true,
+        "DefaultRouteSettings": {
+          "DetailedMetricsEnabled": false
+        }
+      }
+    },
+    "AppointmentLambdaPermissionHttpApi": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "AppointmentLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "HttpApi"
+              },
+              "/*"
+            ]
+          ]
+        }
+      }
+    },
+    "HttpApiIntegrationAppointment": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "AppointmentLambdaFunction",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      }
+    },
+    "HttpApiRoutePostAppointment": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /appointment",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "HttpApiIntegrationAppointment"
+              }
+            ]
+          ]
+        }
+      },
+      "DependsOn": "HttpApiIntegrationAppointment"
+    },
+    "HttpApiRouteGetAppointmentInsuredidVar": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /appointment/{insuredId}",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "HttpApiIntegrationAppointment"
+              }
+            ]
+          ]
+        }
+      },
+      "DependsOn": "HttpApiIntegrationAppointment"
+    },
+    "AppointmentsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "insuredId",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "scheduleId",
+            "AttributeType": "N"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "insuredId",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "scheduleId",
+            "KeyType": "RANGE"
+          }
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "TableName": "appointments-table-dev-1762321688051"
+      }
+    },
+    "SqsConfirmaciones": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "sqs_confirmaciones"
+      }
+    },
+    "AppointmentTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": "appointment-topic-dev"
+      }
+    },
+    "SqsPE": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "sqs_pe-dev"
+      }
+    },
+    "SqsCL": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "sqs_cl-dev"
+      }
+    },
+    "SnsSubscriptionPE": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "Protocol": "sqs",
+        "TopicArn": {
+          "Ref": "AppointmentTopic"
+        },
+        "Endpoint": {
+          "Fn::GetAtt": [
+            "SqsPE",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "SnsSubscriptionCL": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "Protocol": "sqs",
+        "TopicArn": {
+          "Ref": "AppointmentTopic"
+        },
+        "Endpoint": {
+          "Fn::GetAtt": [
+            "SqsCL",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "EventBus": {
+      "Type": "AWS::Events::EventBus",
+      "Properties": {
+        "Name": "rimacchallenge-bus-dev"
+      }
+    },
+    "SqsPolicyPE": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "Queues": [
+          {
+            "Ref": "SqsPE"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "SQS:SendMessage",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SqsPE",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Ref": "AppointmentTopic"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "SqsPolicyCL": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "Queues": [
+          {
+            "Ref": "SqsCL"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "SQS:SendMessage",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SqsCL",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Ref": "AppointmentTopic"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessDeploymentBucketName": {
+      "Value": "serverless-framework-deployments-us-east-1-37d6dadd-3cf9",
+      "Export": {
+        "Name": "sls-rimacchallenge-dev-ServerlessDeploymentBucketName"
+      }
+    },
+    "AppointmentLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "AppointmentLambdaVersionZaqcfAqtZGmNxu1FgAtil9z1lZzqybivFFsgDJzazY"
+      },
+      "Export": {
+        "Name": "sls-rimacchallenge-dev-AppointmentLambdaFunctionQualifiedArn"
+      }
+    },
+    "AppointmentUnderscorepeLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "AppointmentUnderscorepeLambdaVersionJNW9jzHd49VnOqC7g04yAW4GKHPXDjY42h7aKzvnAcg"
+      },
+      "Export": {
+        "Name": "sls-rimacchallenge-dev-AppointmentUnderscorepeLambdaFunctionQualifiedArn"
+      }
+    },
+    "AppointmentUnderscoreclLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "AppointmentUnderscoreclLambdaVersionQAGEEsNayb2GC6J6Euse0xRTyvOfz6pbTLC6XpNM3o"
+      },
+      "Export": {
+        "Name": "sls-rimacchallenge-dev-AppointmentUnderscoreclLambdaFunctionQualifiedArn"
+      }
+    },
+    "HttpApiId": {
+      "Description": "Id of the HTTP API",
+      "Value": {
+        "Ref": "HttpApi"
+      },
+      "Export": {
+        "Name": "sls-rimacchallenge-dev-HttpApiId"
+      }
+    },
+    "HttpApiUrl": {
+      "Description": "URL of the HTTP API",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "HttpApi"
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix"
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": "sls-rimacchallenge-dev-HttpApiUrl"
+      }
+    }
+  }
+}
